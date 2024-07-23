@@ -104,7 +104,8 @@ if __name__ == "__main__":
     RUNS = int(os.environ['RUNS'])
     NUM_MERCHANTS = int(os.environ['NUM_MERCHANTS'])
     NUM_TRANSACTIONS_PER_MERCHANT = int(os.environ['NUM_TRANSACTIONS_PER_MERCHANT'])
-    WINDOW_SIZE = int(os.environ['WINDOW_SIZE'])
+    PERIODIC_STATISTICS_INTERVAL = int(os.environ['PERIODIC_STATISTICS_INTERVAL'])
+    PERIODIC_STATISTICS_WINDOW_SIZE = int(os.environ['PERIODIC_STATISTICS_WINDOW_SIZE'])
 
     random_seeds = generate_random_seeds(RANDOM_SEED, RUNS)
 
@@ -129,8 +130,8 @@ if __name__ == "__main__":
         for merchant_id, amounts in transactions.items():
             for amount in amounts:
                 bookkeeping.add_transaction(merchant_id, amount)
-                if bookkeeping.get_transaction_count(merchant_id) % WINDOW_SIZE == 0:
-                    bookkeeping.update_periodic_statistics(merchant_id, WINDOW_SIZE)  
+                if bookkeeping.get_transaction_count(merchant_id) % PERIODIC_STATISTICS_INTERVAL == 0:
+                    bookkeeping.update_periodic_statistics(merchant_id, PERIODIC_STATISTICS_WINDOW_SIZE)  
 
         # Summarize and print the results for each merchant
         for merchant_id in transactions.keys():
