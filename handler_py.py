@@ -1,8 +1,10 @@
 import random
 import time
 import cProfile
+import os
 import logging
 from datetime import datetime
+from helpers import generate_random_seeds, generate_transactions
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -57,7 +59,7 @@ class Bookkeeping:
         else:
             raise ValueError("Merchant ID not found")
     
-    def calculate_moving_average(self, merchant_id, window_size=1000):
+    def calculate_moving_average(self, merchant_id, window_size):
         if merchant_id in self.transactions:
             transactions = self.transactions[merchant_id]
             if len(transactions) >= window_size:
@@ -68,23 +70,19 @@ class Bookkeeping:
         else:
             raise ValueError("Merchant ID not found")
 
-    def generate_transactions(self, num_merchants, num_transactions, seed=42):
-        random.seed(seed)
-        transactions = {}
-        for _ in range(num_merchants):
-            merchant_id = f"merchant_{random.randint(1000, 9999)}"
-            transactions[merchant_id] = [random.uniform(1.0, 1000.0) for _ in range(num_transactions)]
-        return transactions
 
 if __name__ == "__main__":
 
     profiler = cProfile.Profile()
 
     time_taken = []
-    RUNS = 5
-    NUM_MERCHANTS = 2000
-    NUM_TRANSACTIONS_PER_MERCHANT = 10000
-    WINDOW_SIZE = 1000
+    RANDOM_SEED = int(os.environ['RANDOM_SEED'])
+    RUNS = int(os.environ['RUNS'])
+    NUM_MERCHANTS = int(os.environ['NUM_MERCHANTS'])
+    NUM_TRANSACTIONS_PER_MERCHANT = int(os.environ['NUM_TRANSACTIONS_PER_MERCHANT'])
+    WINDOW_SIZE = int(os.environ['WINDOW_SIZE'])
+
+    random_seeds = generate_random_seeds(RANDOM_SEED, RUNS)
 
     for i in range(RUNS):
 
@@ -95,7 +93,7 @@ if __name__ == "__main__":
         bookkeeping = Bookkeeping()
 
         # Generate random transactions
-        transactions = bookkeeping.generate_transactions(NUM_MERCHANTS, NUM_TRANSACTIONS_PER_MERCHANT)
+        transactions = generate_transactions(NUM_MERCHANTS, NUM_TRANSACTIONS_PER_MERCHANT, random_seeds[i])
 
         logger.info("Generated transactions")
 

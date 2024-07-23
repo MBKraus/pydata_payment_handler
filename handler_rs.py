@@ -1,8 +1,10 @@
 import time
 import random
 from payment_handler_rs import PaymentHandler
+from helpers import generate_random_seeds, generate_transactions
 import logging
 from datetime import datetime
+import os
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -12,25 +14,22 @@ logging.basicConfig(
 # Create a logger object
 logger = logging.getLogger(__name__)
 
-def generate_transactions(num_merchants, num_transactions, seed=42):
-    random.seed(seed)
-    transactions = {}
-    for _ in range(num_merchants):
-        merchant_id = f"merchant_{random.randint(1000, 9999)}"
-        transactions[merchant_id] = [random.uniform(1.0, 1000.0) for _ in range(num_transactions)]
-    return transactions
 
 if __name__ == "__main__":
     time_taken = []
-    RUNS = 5
-    NUM_MERCHANTS = 2000
-    NUM_TRANSACTIONS_PER_MERCHANT = 10000
+    RANDOM_SEED = int(os.environ['RANDOM_SEED'])
+    RUNS = int(os.environ['RUNS'])
+    NUM_MERCHANTS = int(os.environ['NUM_MERCHANTS'])
+    NUM_TRANSACTIONS_PER_MERCHANT = int(os.environ['NUM_TRANSACTIONS_PER_MERCHANT'])
+    WINDOW_SIZE = int(os.environ['WINDOW_SIZE'])
+
+    random_seeds = generate_random_seeds(RANDOM_SEED, RUNS)
 
     for i in range(RUNS):
         logger.info(f"Starting run {i+1}/{RUNS}")
         payment_handler = PaymentHandler()
         
-        transactions = generate_transactions(NUM_MERCHANTS, NUM_TRANSACTIONS_PER_MERCHANT)
+        transactions = generate_transactions(NUM_MERCHANTS, NUM_TRANSACTIONS_PER_MERCHANT, random_seeds[i])
         logger.info("Generated transactions")
 
         start_time = time.time()
@@ -40,7 +39,7 @@ if __name__ == "__main__":
         for merchant_id, amounts in transactions.items():
             for amount in amounts:
                 payment_handler.add_transaction(merchant_id, amount)
-                payment_handler.calculate_moving_average(merchant_id, 1000)
+                payment_handler.calculate_moving_average(merchant_id, WINDOW_SIZE)
 
         for merchant_id in transactions.keys():
             summary = payment_handler.summarize(merchant_id)
