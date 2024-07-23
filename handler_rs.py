@@ -1,10 +1,10 @@
 import time
-import random
 from payment_handler_rs import PaymentHandler
 from helpers import generate_random_seeds, generate_transactions
 import logging
 from datetime import datetime
 import os
+import cProfile
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
+
+    profiler = cProfile.Profile()
+
     time_taken = []
     RANDOM_SEED = int(os.environ['RANDOM_SEED'])
     RUNS = int(os.environ['RUNS'])
@@ -36,6 +39,7 @@ if __name__ == "__main__":
         start_time = time.time()
         start_time_formatted = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
         logger.info("Start time: %s", start_time_formatted)
+        profiler.enable()
 
         # Add transactions to the Bookkeeping instance
         for merchant_id, amounts in transactions.items():
@@ -45,6 +49,11 @@ if __name__ == "__main__":
         for merchant_id in transactions.keys():
             summary = payment_handler.summarize(merchant_id)
             # print(f"Summary for {merchant_id}: {summary}")
+
+        profiler.disable()
+        logger.info("#############")
+        # profiler.print_stats()
+        profiler.dump_stats(f"reports/python/run_{i+1}.prof")
 
         end_time = time.time()
         end_time_formatted = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')

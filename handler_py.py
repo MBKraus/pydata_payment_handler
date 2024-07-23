@@ -1,4 +1,3 @@
-import random
 import time
 import cProfile
 import os
@@ -111,7 +110,6 @@ if __name__ == "__main__":
 
     for i in range(RUNS):
 
-        # profiler.enable()
         logger.info(f"Starting run {i+1}/{RUNS}")
 
         # Create a Bookkeeping instance
@@ -125,6 +123,7 @@ if __name__ == "__main__":
         start_time = time.time()
         start_time_formatted = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
         logger.info("Start time: %s", start_time_formatted)
+        profiler.enable()
 
         # Add transactions to the Bookkeeping instance
         for merchant_id, amounts in transactions.items():
@@ -138,6 +137,11 @@ if __name__ == "__main__":
             summary = bookkeeping.summarize(merchant_id)
             # print(f"Summary for {merchant_id}: {summary}")
    
+        profiler.disable()
+        logger.info("#############")
+        # profiler.print_stats()
+        profiler.dump_stats(f"reports/python/run_{i+1}.prof")
+
         end_time = time.time()
         end_time_formatted = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
         elapsed_time = end_time - start_time
@@ -145,9 +149,6 @@ if __name__ == "__main__":
         logger.info(f"Time taken to run __main__: {elapsed_time:.2f} seconds")
 
         time_taken.append(elapsed_time)
-
-        # profiler.disable()
-        # profiler.print_stats()
 
     logger.info(f"Average time taken to run __main__: {sum(time_taken)/len(time_taken):.2f} seconds")
     logger.info(f"Max time taken to run __main__: {max(time_taken):.2f} seconds")
