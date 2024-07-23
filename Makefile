@@ -3,9 +3,9 @@
 # export VIRTUAL_ENV={path to your virtual environment}
 export RANDOM_SEED=42
 export RUNS=5
-export NUM_MERCHANTS=2000
-export NUM_TRANSACTIONS_PER_MERCHANT=10000
-export WINDOW_SIZE=1000
+export NUM_MERCHANTS=3000
+export NUM_TRANSACTIONS_PER_MERCHANT=20000
+export WINDOW_SIZE=50
 
 develop:
 	maturin develop 

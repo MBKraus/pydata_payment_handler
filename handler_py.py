@@ -5,6 +5,7 @@ import os
 import logging
 from datetime import datetime
 from helpers import generate_random_seeds, generate_transactions
+import math
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -17,12 +18,22 @@ logger = logging.getLogger(__name__)
 class Bookkeeping:
     def __init__(self):
         self.transactions = {}
-        self.moving_averages = {}
+        self.transaction_counts = {}
+        self.periodic_averages = {}
+        self.periodic_stddevs = {}
 
     def add_transaction(self, merchant_id, amount):
         if merchant_id not in self.transactions:
             self.transactions[merchant_id] = []
+            self.transaction_counts[merchant_id] = 0
         self.transactions[merchant_id].append(amount)
+        self.transaction_counts[merchant_id] += 1
+
+    def get_transaction_count(self, merchant_id):
+        if merchant_id in self.transaction_counts:
+            return self.transaction_counts[merchant_id]
+        else:
+            raise ValueError("Merchant ID not found")
 
     def compute_totals(self, merchant_id):
         if merchant_id in self.transactions:
@@ -59,16 +70,29 @@ class Bookkeeping:
         else:
             raise ValueError("Merchant ID not found")
     
-    def calculate_moving_average(self, merchant_id, window_size):
+    def calculate_periodic_average(self, transactions, window_size):
+            return sum(transactions[-window_size:]) / window_size
+
+    def calculate_periodic_stddev(self, transactions, window_size):
+        periodic_average = self.calculate_periodic_average(transactions, window_size)
+        variance = sum((x - periodic_average) ** 2 for x in transactions[-window_size:]) / window_size
+        return math.sqrt(variance)
+
+    def update_periodic_statistics(self, merchant_id, window_size):
         if merchant_id in self.transactions:
             transactions = self.transactions[merchant_id]
             if len(transactions) >= window_size:
-                moving_average = sum(transactions[-window_size:]) / window_size
-                if merchant_id not in self.moving_averages:
-                    self.moving_averages[merchant_id] = []
-                self.moving_averages[merchant_id].append(moving_average)
+                periodic_average = self.calculate_periodic_average(transactions, window_size)
+                periodic_stddev = self.calculate_periodic_stddev(transactions, window_size)
+                if merchant_id not in self.periodic_averages:
+                    self.periodic_averages[merchant_id] = []
+                if merchant_id not in self.periodic_stddevs:
+                    self.periodic_stddevs[merchant_id] = []
+                self.periodic_averages[merchant_id].append(periodic_average)
+                self.periodic_stddevs[merchant_id].append(periodic_stddev)
         else:
             raise ValueError("Merchant ID not found")
+
 
 
 if __name__ == "__main__":
@@ -105,7 +129,8 @@ if __name__ == "__main__":
         for merchant_id, amounts in transactions.items():
             for amount in amounts:
                 bookkeeping.add_transaction(merchant_id, amount)
-                bookkeeping.calculate_moving_average(merchant_id, WINDOW_SIZE)  # Calculate moving average
+                if bookkeeping.get_transaction_count(merchant_id) % WINDOW_SIZE == 0:
+                    bookkeeping.update_periodic_statistics(merchant_id, WINDOW_SIZE)  
 
         # Summarize and print the results for each merchant
         for merchant_id in transactions.keys():

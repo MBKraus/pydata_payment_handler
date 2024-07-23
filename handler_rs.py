@@ -36,10 +36,12 @@ if __name__ == "__main__":
         start_time_formatted = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
         logger.info("Start time: %s", start_time_formatted)
 
+        # Add transactions to the Bookkeeping instance
         for merchant_id, amounts in transactions.items():
             for amount in amounts:
                 payment_handler.add_transaction(merchant_id, amount)
-                payment_handler.calculate_moving_average(merchant_id, WINDOW_SIZE)
+                if payment_handler.get_transaction_count(merchant_id) % WINDOW_SIZE == 0:
+                    payment_handler.update_periodic_statistics(merchant_id, WINDOW_SIZE)  
 
         for merchant_id in transactions.keys():
             summary = payment_handler.summarize(merchant_id)
