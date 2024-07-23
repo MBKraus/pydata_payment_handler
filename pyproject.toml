@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "payment-handler-case"
+version = "0.1.0"
+description = ""
+authors = ["Mike Kraus <mike.kraus@mollie.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+maturin = "1.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
