@@ -1,12 +1,13 @@
 .PHONY: develop, release, python_handler, rust_handler
 
 # export VIRTUAL_ENV={path to your virtual environment}
-export RANDOM_SEED=42
+export INITIAL_SEED=42
 export RUNS=5
-export NUM_MERCHANTS=8000
-export NUM_TRANSACTIONS_PER_MERCHANT=10000
-export PERIODIC_STATISTICS_INTERVAL=50
-export PERIODIC_STATISTICS_WINDOW_SIZE=50
+export NUM_MERCHANTS=2000
+export NUM_PAYMENTS_PER_MERCHANT=10000
+export PERIODIC_STATISTICS_INTERVAL=100
+export PERIODIC_STATISTICS_WINDOW_SIZE=100
+export CONFIDENCE_INTERVAL=0.9
 
 develop:
 	maturin develop 
