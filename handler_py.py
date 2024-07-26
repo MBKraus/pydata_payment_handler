@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from helpers import generate_random_seeds, generate_payments, setup_environment, initialize_profiler, log_time
 import math
+import joblib
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -130,6 +131,7 @@ def main():
         elapsed_time = log_time(start_time, end_time)
         time_taken.append(elapsed_time)
 
+    joblib.dump(time_taken, 'reports/python/time_taken.joblib')
     logger.info(f"Average time taken: {sum(time_taken)/len(time_taken):.2f} seconds")
     logger.info(f"Max time taken: {max(time_taken):.2f} seconds")
     logger.info(f"Min time taken: {min(time_taken):.2f} seconds")

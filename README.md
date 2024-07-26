@@ -15,5 +15,8 @@ To do
 - payment by payment check count loop in rust
 - hand all payments to rust
 
+- add min/max
+- dont do random generate payments at each run
+
 
 

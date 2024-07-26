@@ -5,6 +5,7 @@ import cProfile
 import os
 import logging
 from datetime import datetime
+import joblib
 from helpers import generate_random_seeds, generate_payments, setup_environment, initialize_profiler, log_time
 import math
 
@@ -39,12 +40,13 @@ def main():
                 payment_handler.calculate_balance_var(payment["merchant_id"], config['confidence_interval'])
 
         profiler.disable()
-        profiler.dump_stats(f"reports/python/run_{run_index + 1}.prof")
+        profiler.dump_stats(f"reports/rust/run_{run_index + 1}.prof")
 
         end_time = time.time()
         elapsed_time = log_time(start_time, end_time)
         time_taken.append(elapsed_time)
 
+    joblib.dump(time_taken, 'reports/rust/time_taken.joblib')
     logger.info(f"Average time taken: {sum(time_taken)/len(time_taken):.2f} seconds")
     logger.info(f"Max time taken: {max(time_taken):.2f} seconds")
     logger.info(f"Min time taken: {min(time_taken):.2f} seconds")

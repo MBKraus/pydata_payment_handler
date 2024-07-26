@@ -4,6 +4,7 @@ import os
 import cProfile
 from datetime import datetime
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,3 +64,4 @@ def log_time(start_time, end_time):
     logger.info("End time: %s", end_formatted)
     logger.info(f"Time taken: {elapsed_time:.2f} seconds")
     return elapsed_time
+
