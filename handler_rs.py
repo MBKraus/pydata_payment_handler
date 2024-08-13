@@ -4,6 +4,7 @@ import time
 import cProfile
 import os
 import logging
+import pandas as pd
 from datetime import datetime
 import joblib
 from helpers import generate_random_seeds, generate_payments, setup_environment, initialize_profiler, log_time
@@ -20,14 +21,15 @@ logger = logging.getLogger(__name__)
 def main():
     config = setup_environment()
     profiler = initialize_profiler()
-    random_seeds = generate_random_seeds(config['initial_seed'], config['runs'])
     time_taken = []
 
     for run_index in range(config['runs']):
-        logger.info(f"Starting run {run_index + 1}/{config['runs']}")
 
-        payments = generate_payments(config['num_merchants'], config['num_payments_per_merchant'], random_seeds[run_index])
-        logger.info("Generated payments")
+        logger.info("Loading payments")
+
+        payments = pd.read_parquet(f'artefacts/payments/payments_{run_index}.parquet').to_dict(orient='records')
+
+        logger.info(f"Starting run {run_index + 1}/{config['runs']}")
 
         start_time = time.time()
         profiler.enable()
@@ -40,13 +42,13 @@ def main():
                 payment_handler.calculate_balance_var(payment["merchant_id"], config['confidence_interval'])
 
         profiler.disable()
-        profiler.dump_stats(f"reports/rust/run_{run_index + 1}.prof")
+        profiler.dump_stats(f"artefacts/rust/run_{run_index + 1}.prof")
 
         end_time = time.time()
         elapsed_time = log_time(start_time, end_time)
         time_taken.append(elapsed_time)
 
-    joblib.dump(time_taken, 'reports/rust/time_taken.joblib')
+    joblib.dump(time_taken, 'artefacts/rust/time_taken.joblib')
     logger.info(f"Average time taken: {sum(time_taken)/len(time_taken):.2f} seconds")
     logger.info(f"Max time taken: {max(time_taken):.2f} seconds")
     logger.info(f"Min time taken: {min(time_taken):.2f} seconds")

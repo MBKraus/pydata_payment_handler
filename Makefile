@@ -3,11 +3,11 @@
 # export VIRTUAL_ENV={path to your virtual environment}
 export INITIAL_SEED=42
 export RUNS=20
-export NUM_MERCHANTS=1000 #1000
-export NUM_PAYMENTS_PER_MERCHANT=5000 #10000
+export NUM_MERCHANTS=2500 #1000
+export NUM_PAYMENTS_PER_MERCHANT=10000 #10000
 export PERIODIC_STATISTICS_INTERVAL=100 #100
 export PERIODIC_STATISTICS_WINDOW_SIZE=100 #100
-export CONFIDENCE_INTERVAL=0.9
+export CONFIDENCE_INTERVAL=0.95
 
 develop:
 	maturin develop 
@@ -21,6 +21,9 @@ python_handler:
 
 rust_handler:
 	python handler_rs.py
+
+generate_payments:
+	python generate_payments.py
 
 plot_dist:
 	python plot_dist.py

@@ -18,5 +18,7 @@ To do
 - add min/max
 - dont do random generate payments at each run
 
+Snakeviz
 
+snakeviz profile_output.prof
 
