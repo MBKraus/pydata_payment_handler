@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import joblib
 
-python_data = joblib.load('reports/python/time_taken.joblib')
-rust_data = joblib.load('reports/rust/time_taken.joblib')
+python_data = joblib.load('artefacts/python/time_taken.joblib')
+rust_data = joblib.load('artefacts/rust/time_taken.joblib')
 
-# # Create a DataFrame for easier plotting with Seaborn
-# df = pd.DataFrame({
-#     'value': python_data + rust_data,
-#     'distribution': ['Python'] * len(python_data) + ['Rust'] * len(rust_data)
-# })
+# Create a DataFrame for easier plotting with Seaborn
+df = pd.DataFrame({
+    'value': python_data + rust_data,
+    'distribution': ['Python'] * len(python_data) + ['Rust'] * len(rust_data)
+})
 
 # Create a DataFrame for easier plotting with Seaborn
 df = pd.DataFrame({
@@ -27,7 +27,7 @@ mean1 = df[df['distribution'] == 'Python']['value'].mean()
 mean2 = df[df['distribution'] == 'Rust']['value'].mean()
 
 plt.axvline(mean1, color='blue', linestyle='--', label=f'Mean Python: {mean1:.2f}')
-# plt.axvline(mean2, color='orange', linestyle='--', label=f'Mean Rust: {mean2:.2f}')
+plt.axvline(mean2, color='orange', linestyle='--', label=f'Mean Rust: {mean2:.2f}')
 
 plt.legend()
 plt.title('Distribution Plot')
