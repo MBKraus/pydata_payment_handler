@@ -5,7 +5,7 @@ Steps to run the payment handler scripts:
 
 1) install [Rust](https://www.rust-lang.org/tools/install)
 2) create a Python 3.10 virtual environment 
-2) install Poetry in this virtual environment and
+2) install [Poetry](https://python-poetry.org/) in this virtual environment and
    install the project's dependencies (`poetry install`) 
    Note: The lock file in the repo was generated with Poetry 1.8.3
 3) ensure you put the path to your virtual environment in VIRTUAL_ENV (`export VIRTUAL_ENV=<path_to_virtual_env>`)
