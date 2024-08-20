@@ -1,14 +1,14 @@
-1) poetry install 
-2) maturin new -b pyo3 payment_handler_rs then edit Cargo.toml to add abi3-py38 feature
-3) development -> maturin develop (for dev profile)
-4) release
-
-export VIRTUAL_ENV = /Users/mkraus/opt/miniconda3/envs/pydata
-
-maturin build --release --target x86_64-apple-darwin
-
-pip install target/wheels/payment_handler_rs-0.1.0-cp310-cp310-macosx_10_12_x86_64.whl --force-reinstall
+## Polishing Python: Preventing Performance Corrosion with Rust
 
 
+Steps to run the payment handler scripts:
 
-
+1) install [Rust](https://www.rust-lang.org/tools/install)
+2) create a Python 3.10 virtual environment 
+2) install [Poetry](https://python-poetry.org/) in this virtual environment and
+   install the project's dependencies (`poetry install`) 
+   Note: The lock file in the repo was generated with Poetry 1.8.3
+3) ensure you put the path to your virtual environment in VIRTUAL_ENV (`export VIRTUAL_ENV=<path_to_virtual_env>`)
+4) build and install the wheel in your Python environment (`maturin develop`)
+5) generate payment batches with `make generate_payments`
+6) run the Python and Rust payment handler with `make python_handler` and `make rust_handler`, respectively

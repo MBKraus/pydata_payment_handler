@@ -1,10 +1,14 @@
-import time
-import random
+
 from payment_handler_rs import PaymentHandler
-from helpers import generate_random_seeds, generate_transactions
-import logging
-from datetime import datetime
+import time
+import cProfile
 import os
+import logging
+import pandas as pd
+from datetime import datetime
+import joblib
+from helpers import generate_random_seeds, generate_payments, setup_environment, initialize_profiler, log_time
+import math
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -14,45 +18,40 @@ logging.basicConfig(
 # Create a logger object
 logger = logging.getLogger(__name__)
 
-
-if __name__ == "__main__":
+def main():
+    config = setup_environment()
+    profiler = initialize_profiler()
     time_taken = []
-    RANDOM_SEED = int(os.environ['RANDOM_SEED'])
-    RUNS = int(os.environ['RUNS'])
-    NUM_MERCHANTS = int(os.environ['NUM_MERCHANTS'])
-    NUM_TRANSACTIONS_PER_MERCHANT = int(os.environ['NUM_TRANSACTIONS_PER_MERCHANT'])
-    WINDOW_SIZE = int(os.environ['WINDOW_SIZE'])
 
-    random_seeds = generate_random_seeds(RANDOM_SEED, RUNS)
+    for run_index in range(config['runs']):
 
-    for i in range(RUNS):
-        logger.info(f"Starting run {i+1}/{RUNS}")
-        payment_handler = PaymentHandler()
-        
-        transactions = generate_transactions(NUM_MERCHANTS, NUM_TRANSACTIONS_PER_MERCHANT, random_seeds[i])
-        logger.info("Generated transactions")
+        logger.info("Loading payments")
+
+        payments = pd.read_parquet(f'artefacts/payments/payments_{run_index}.parquet').to_dict(orient='records')
+
+        logger.info(f"Starting run {run_index + 1}/{config['runs']}")
 
         start_time = time.time()
-        start_time_formatted = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
-        logger.info("Start time: %s", start_time_formatted)
+        profiler.enable()
 
-        for merchant_id, amounts in transactions.items():
-            for amount in amounts:
-                payment_handler.add_transaction(merchant_id, amount)
-                payment_handler.calculate_moving_average(merchant_id, WINDOW_SIZE)
+        payment_handler = PaymentHandler()
+        for payment in payments:
+            payment_handler.process_payment(payment["merchant_id"], payment["amount"])
+            if payment_handler.get_payment_count(payment["merchant_id"]) % config['periodic_statistics_interval'] == 0:
+                payment_handler.update_periodic_statistics(payment["merchant_id"], config['periodic_statistics_window_size'])
+                payment_handler.calculate_balance_var(payment["merchant_id"], config['confidence_interval'])
 
-        for merchant_id in transactions.keys():
-            summary = payment_handler.summarize(merchant_id)
-            # print(f"Summary for {merchant_id}: {summary}")
+        profiler.disable()
+        profiler.dump_stats(f"artefacts/rust/run_{run_index + 1}.prof")
 
         end_time = time.time()
-        end_time_formatted = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
-        elapsed_time = end_time - start_time
-        logger.info("End time: %s", end_time_formatted)
-        logger.info(f"Time taken to run __main__: {elapsed_time:.2f} seconds")
-
+        elapsed_time = log_time(start_time, end_time)
         time_taken.append(elapsed_time)
 
-    logger.info(f"Average time taken to run __main__: {sum(time_taken) / len(time_taken):.2f} seconds")
-    logger.info(f"Max time taken to run __main__: {max(time_taken):.2f} seconds")
-    logger.info(f"Min time taken to run __main__: {min(time_taken):.2f} seconds")
+    joblib.dump(time_taken, 'artefacts/rust/time_taken.joblib')
+    logger.info(f"Average time taken: {sum(time_taken)/len(time_taken):.2f} seconds")
+    logger.info(f"Max time taken: {max(time_taken):.2f} seconds")
+    logger.info(f"Min time taken: {min(time_taken):.2f} seconds")
+
+if __name__ == "__main__":
+    main()

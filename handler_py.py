@@ -1,10 +1,12 @@
-import random
 import time
 import cProfile
 import os
 import logging
 from datetime import datetime
-from helpers import generate_random_seeds, generate_transactions
+from helpers import generate_random_seeds, generate_payments, setup_environment, initialize_profiler, log_time
+import math
+import joblib
+import pandas as pd
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to INFO
@@ -14,115 +16,129 @@ logging.basicConfig(
 # Create a logger object
 logger = logging.getLogger(__name__)
 
-class Bookkeeping:
+class PaymentHandler:
     def __init__(self):
-        self.transactions = {}
-        self.moving_averages = {}
+        self.payments = {}
+        self.payment_counts = {}
+        self.current_balances = {}
+        self.cumulative_balances = {}
+        self.periodic_average_payments = {}
+        self.periodic_std_payments = {}
+        self.var_cumulative_balances = {}
 
-    def add_transaction(self, merchant_id, amount):
-        if merchant_id not in self.transactions:
-            self.transactions[merchant_id] = []
-        self.transactions[merchant_id].append(amount)
+    def initialize_merchant(self, merchant_id):
+        """Initialize merchant data structures if not already initialized."""
+        if merchant_id not in self.payments:
+            self.payments[merchant_id] = []
+            self.payment_counts[merchant_id] = 0
+            self.current_balances[merchant_id] = 0.0  
+            self.cumulative_balances[merchant_id] = [0.0]
+            self.var_cumulative_balances[merchant_id] = []
 
-    def compute_totals(self, merchant_id):
-        if merchant_id in self.transactions:
-            return sum(self.transactions[merchant_id])
+    def process_payment(self, merchant_id, amount):
+        """Process a payment for a merchant."""
+        self.initialize_merchant(merchant_id)
+        self.payments[merchant_id].append(amount)
+        self.payment_counts[merchant_id] += 1
+        self.current_balances[merchant_id] += amount  
+        self.cumulative_balances[merchant_id].append(self.current_balances[merchant_id])  # Update cumulative balance
+
+    def get_payment_count(self, merchant_id):
+        """Get the payment count for a merchant."""
+        if merchant_id in self.payment_counts:
+            return self.payment_counts[merchant_id]
         else:
             raise ValueError("Merchant ID not found")
 
-    def compute_average(self, merchant_id):
-        if merchant_id in self.transactions:
-            total = sum(self.transactions[merchant_id])
-            return total / len(self.transactions[merchant_id])
+    def calculate_periodic_average(self, values, window_size):
+        """Calculate the average of the last 'window_size' values."""
+        if len(values) < window_size:
+            raise ValueError("Not enough values to calculate average")
+        return sum(values[-window_size:]) / window_size
+
+    def calculate_periodic_std(self, values, window_size):
+        """Calculate the standard deviation of the last 'window_size' values."""
+        avg = self.calculate_periodic_average(values, window_size)
+        variance = sum((x - avg) ** 2 for x in values[-window_size:]) / window_size
+        return math.sqrt(variance)
+
+    def update_periodic_statistics(self, merchant_id, window_size):
+        """Update the periodic statistics for a merchant."""
+        if merchant_id in self.payments:
+            payments = self.payments[merchant_id]
+            if len(payments) >= window_size:
+                avg = self.calculate_periodic_average(payments, window_size)
+                std = self.calculate_periodic_std(payments, window_size)
+                self._append_to_dict_list(self.periodic_average_payments, merchant_id, avg)
+                self._append_to_dict_list(self.periodic_std_payments, merchant_id, std)
         else:
             raise ValueError("Merchant ID not found")
 
-    def find_extremes(self, merchant_id):
-        if merchant_id in self.transactions:
-            highest = max(self.transactions[merchant_id])
-            lowest = min(self.transactions[merchant_id])
-            return highest, lowest
-        else:
+    def calculate_var(self, values, confidence_level):
+        """Calculate the Value at Risk (VaR) for a list of values."""
+        if not values:
+            raise ValueError("The values list is empty")
+
+        sorted_values = sorted(values)
+        index = int((1 - confidence_level) * len(sorted_values))
+        return sorted_values[index]
+
+    def calculate_balance_var(self, merchant_id, confidence_level):
+        """Calculate the VaR for the cumulative balances of a merchant."""
+        if merchant_id not in self.cumulative_balances:
             raise ValueError("Merchant ID not found")
 
-    def summarize(self, merchant_id):
-        if merchant_id in self.transactions:
-            total = self.compute_totals(merchant_id)
-            average = self.compute_average(merchant_id)
-            highest, lowest = self.find_extremes(merchant_id)
-            return {
-                'total': total,
-                'average': average,
-                'highest': highest,
-                'lowest': lowest
-            }
-        else:
-            raise ValueError("Merchant ID not found")
-    
-    def calculate_moving_average(self, merchant_id, window_size):
-        if merchant_id in self.transactions:
-            transactions = self.transactions[merchant_id]
-            if len(transactions) >= window_size:
-                moving_average = sum(transactions[-window_size:]) / window_size
-                if merchant_id not in self.moving_averages:
-                    self.moving_averages[merchant_id] = []
-                self.moving_averages[merchant_id].append(moving_average)
-        else:
-            raise ValueError("Merchant ID not found")
+        cumulative_balances = self.cumulative_balances[merchant_id]
+        if len(cumulative_balances) <= 1:
+            raise ValueError("Not enough balance data to calculate VaR")
+
+        var = self.calculate_var(cumulative_balances, confidence_level)
+        self._append_to_dict_list(self.var_cumulative_balances, merchant_id, var)
+        return var
+
+    def _append_to_dict_list(self, dictionary, key, value):
+        """Helper method to append a value to a list in a dictionary."""
+        if key not in dictionary:
+            dictionary[key] = []
+        dictionary[key].append(value)
+
+
+def main():
+    config = setup_environment()
+    profiler = initialize_profiler()
+    time_taken = []
+
+    for run_index in range(config['runs']):
+        
+        logger.info("Loading payments")
+
+        payments = pd.read_parquet(f'artefacts/payments/payments_{run_index}.parquet').to_dict(orient='records')
+
+        logger.info(f"Starting run {run_index + 1}/{config['runs']}")
+
+        start_time = time.time()
+        profiler.enable()
+
+        payment_handler = PaymentHandler()
+
+        for payment in payments:
+            payment_handler.process_payment(payment["merchant_id"], payment["amount"])
+            if payment_handler.get_payment_count(payment["merchant_id"]) % config['periodic_statistics_interval'] == 0:
+                payment_handler.update_periodic_statistics(payment["merchant_id"], config['periodic_statistics_window_size'])
+                payment_handler.calculate_balance_var(payment["merchant_id"], config['confidence_interval'])
+
+        profiler.disable()
+        profiler.dump_stats(f"artefacts/python/run_{run_index + 1}.prof")
+
+        end_time = time.time()
+        elapsed_time = log_time(start_time, end_time)
+        time_taken.append(elapsed_time)
+
+    joblib.dump(time_taken, 'artefacts/python/time_taken.joblib')
+    logger.info(f"Average time taken: {sum(time_taken)/len(time_taken):.2f} seconds")
+    logger.info(f"Max time taken: {max(time_taken):.2f} seconds")
+    logger.info(f"Min time taken: {min(time_taken):.2f} seconds")
 
 
 if __name__ == "__main__":
-
-    profiler = cProfile.Profile()
-
-    time_taken = []
-    RANDOM_SEED = int(os.environ['RANDOM_SEED'])
-    RUNS = int(os.environ['RUNS'])
-    NUM_MERCHANTS = int(os.environ['NUM_MERCHANTS'])
-    NUM_TRANSACTIONS_PER_MERCHANT = int(os.environ['NUM_TRANSACTIONS_PER_MERCHANT'])
-    WINDOW_SIZE = int(os.environ['WINDOW_SIZE'])
-
-    random_seeds = generate_random_seeds(RANDOM_SEED, RUNS)
-
-    for i in range(RUNS):
-
-        # profiler.enable()
-        logger.info(f"Starting run {i+1}/{RUNS}")
-
-        # Create a Bookkeeping instance
-        bookkeeping = Bookkeeping()
-
-        # Generate random transactions
-        transactions = generate_transactions(NUM_MERCHANTS, NUM_TRANSACTIONS_PER_MERCHANT, random_seeds[i])
-
-        logger.info("Generated transactions")
-
-        start_time = time.time()
-        start_time_formatted = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
-        logger.info("Start time: %s", start_time_formatted)
-
-        # Add transactions to the Bookkeeping instance
-        for merchant_id, amounts in transactions.items():
-            for amount in amounts:
-                bookkeeping.add_transaction(merchant_id, amount)
-                bookkeeping.calculate_moving_average(merchant_id, WINDOW_SIZE)  # Calculate moving average
-
-        # Summarize and print the results for each merchant
-        for merchant_id in transactions.keys():
-            summary = bookkeeping.summarize(merchant_id)
-            # print(f"Summary for {merchant_id}: {summary}")
-   
-        end_time = time.time()
-        end_time_formatted = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
-        elapsed_time = end_time - start_time
-        logger.info("End time: %s", end_time_formatted)
-        logger.info(f"Time taken to run __main__: {elapsed_time:.2f} seconds")
-
-        time_taken.append(elapsed_time)
-
-        # profiler.disable()
-        # profiler.print_stats()
-
-    logger.info(f"Average time taken to run __main__: {sum(time_taken)/len(time_taken):.2f} seconds")
-    logger.info(f"Max time taken to run __main__: {max(time_taken):.2f} seconds")
-    logger.info(f"Min time taken to run __main__: {min(time_taken):.2f} seconds")
+    main()
