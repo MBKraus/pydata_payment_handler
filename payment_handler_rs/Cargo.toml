@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.18", features = ["extension-module"] }
 rand = "0.8"
+rayon = "1.5"
 
 [package.metadata.maturin]
 name = "payment_handler_rs"

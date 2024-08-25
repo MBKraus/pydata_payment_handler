@@ -1,55 +1,83 @@
 use pyo3::prelude::*;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::f64;
+use std::sync::{Arc, Mutex};
 
 #[pyclass]
-pub struct PaymentHandler {
-    payments: HashMap<String, Vec<f64>>,
-    payment_counts: HashMap<String, usize>,
-    current_balances: HashMap<String, f64>,
-    cumulative_balances: HashMap<String, Vec<f64>>,
-    var_cumulative_balances: HashMap<String, Vec<f64>>,
-    periodic_average_payments: HashMap<String, Vec<f64>>,
-    periodic_std_payments: HashMap<String, Vec<f64>>,
+pub struct PaymentHandlerParallel {
+    payments: Arc<Mutex<HashMap<String, Vec<f64>>>>,
+    payment_counts: Arc<Mutex<HashMap<String, usize>>>,
+    current_balances: Arc<Mutex<HashMap<String, f64>>>,
+    cumulative_balances: Arc<Mutex<HashMap<String, Vec<f64>>>>,
+    var_cumulative_balances: Arc<Mutex<HashMap<String, Vec<f64>>>>,
+    periodic_average_payments: Arc<Mutex<HashMap<String, Vec<f64>>>>,
+    periodic_std_payments: Arc<Mutex<HashMap<String, Vec<f64>>>>,
 }
 
 #[pymethods]
-impl PaymentHandler {
+impl PaymentHandlerParallel {
     #[new]
     fn new() -> Self {
-        PaymentHandler {
-            payments: HashMap::new(),
-            payment_counts: HashMap::new(),
-            current_balances: HashMap::new(),
-            cumulative_balances: HashMap::new(),
-            var_cumulative_balances: HashMap::new(),
-            periodic_average_payments: HashMap::new(),
-            periodic_std_payments: HashMap::new(),
+        PaymentHandlerParallel {
+            payments: Arc::new(Mutex::new(HashMap::new())),
+            payment_counts: Arc::new(Mutex::new(HashMap::new())),
+            current_balances: Arc::new(Mutex::new(HashMap::new())),
+            cumulative_balances: Arc::new(Mutex::new(HashMap::new())),
+            var_cumulative_balances: Arc::new(Mutex::new(HashMap::new())),
+            periodic_average_payments: Arc::new(Mutex::new(HashMap::new())),
+            periodic_std_payments: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    fn initialize_merchant(&mut self, merchant_id: String) {
-        if !self.payments.contains_key(&merchant_id) {
-            self.payments.insert(merchant_id.clone(), Vec::new());
-            self.payment_counts.insert(merchant_id.clone(), 0);
-            self.current_balances.insert(merchant_id.clone(), 0.0);
-            self.cumulative_balances.insert(merchant_id.clone(), vec![0.0]);
-            self.var_cumulative_balances.insert(merchant_id.clone(), Vec::new());
+    fn initialize_merchant(&self, merchant_id: &str) {
+        let mut payments = self.payments.lock().unwrap();
+        if !payments.contains_key(merchant_id) {
+            payments.insert(merchant_id.to_string(), Vec::new());
+            self.payment_counts.lock().unwrap().insert(merchant_id.to_string(), 0);
+            self.current_balances.lock().unwrap().insert(merchant_id.to_string(), 0.0);
+            self.cumulative_balances.lock().unwrap().insert(merchant_id.to_string(), vec![0.0]);
+            self.var_cumulative_balances.lock().unwrap().insert(merchant_id.to_string(), Vec::new());
         }
     }
 
-    fn process_payment(&mut self, merchant_id: String, amount: f64) {
-        self.initialize_merchant(merchant_id.clone());
-        self.payments.get_mut(&merchant_id).unwrap().push(amount);
-        let count = self.payment_counts.get_mut(&merchant_id).unwrap();
-        *count += 1;
-        let balance = self.current_balances.get_mut(&merchant_id).unwrap();
-        *balance += amount;
-        self.cumulative_balances.get_mut(&merchant_id).unwrap().push(*balance);
-    }
+    fn process_payments(
+        &self,
+        payments: Vec<(String, f64)>,
+        periodic_statistics_interval: usize,
+        periodic_statistics_window_size: usize,
+        confidence_interval: f64,
+    ) {
+        payments.into_par_iter().for_each(|(merchant_id, amount)| {
+            self.initialize_merchant(&merchant_id);
 
-    fn get_payment_count(&self, merchant_id: String) -> usize {
-        self.payment_counts.get(&merchant_id).cloned().unwrap_or(0)
+            // Process payment
+            let mut payments = self.payments.lock().unwrap();
+            payments.get_mut(&merchant_id).unwrap().push(amount);
+
+            let mut payment_counts = self.payment_counts.lock().unwrap();
+            let count = payment_counts.get_mut(&merchant_id).unwrap();
+            *count += 1;
+
+            let mut current_balances = self.current_balances.lock().unwrap();
+            let balance = current_balances.get_mut(&merchant_id).unwrap();
+            *balance += amount;
+
+            let mut cumulative_balances = self.cumulative_balances.lock().unwrap();
+            cumulative_balances.get_mut(&merchant_id).unwrap().push(*balance);
+
+            // Update statistics periodically
+            if *count % periodic_statistics_interval == 0 {
+                drop(payments); // Release lock before calling self methods
+                drop(payment_counts);
+                drop(current_balances);
+                drop(cumulative_balances);
+
+                // Correct method call
+                self.calculate_periodic_statistics(merchant_id.clone(), periodic_statistics_window_size).unwrap();
+                self.calculate_balance_var(merchant_id.clone(), confidence_interval).unwrap();
+            }
+        });
     }
 
     fn calculate_periodic_average(&self, values: Vec<f64>, window_size: usize) -> PyResult<f64> {
@@ -66,13 +94,20 @@ impl PaymentHandler {
         Ok((variance / window_size as f64).sqrt())
     }
 
-    fn update_periodic_statistics(&mut self, merchant_id: String, window_size: usize) -> PyResult<()> {
-        if let Some(payments) = self.payments.get(&merchant_id) {
+    fn calculate_periodic_statistics(&self, merchant_id: String, window_size: usize) -> PyResult<()> {
+        let payments = {
+            let payments = self.payments.lock().unwrap();
+            payments.get(&merchant_id).cloned()
+        };
+
+        if let Some(payments) = payments {
             if payments.len() >= window_size {
                 let avg = self.calculate_periodic_average(payments.clone(), window_size)?;
                 let std = self.calculate_periodic_std(payments.clone(), window_size)?;
-                self.periodic_average_payments.entry(merchant_id.clone()).or_default().push(avg);
-                self.periodic_std_payments.entry(merchant_id.clone()).or_default().push(std);
+                let mut periodic_average_payments = self.periodic_average_payments.lock().unwrap();
+                periodic_average_payments.entry(merchant_id.clone()).or_default().push(avg);
+                let mut periodic_std_payments = self.periodic_std_payments.lock().unwrap();
+                periodic_std_payments.entry(merchant_id.clone()).or_default().push(std);
                 Ok(())
             } else {
                 Err(pyo3::exceptions::PyValueError::new_err("Not enough values to update statistics"))
@@ -92,13 +127,19 @@ impl PaymentHandler {
         Ok(sorted_values[index])
     }
 
-    fn calculate_balance_var(&mut self, merchant_id: String, confidence_level: f64) -> PyResult<f64> {
-        if let Some(cumulative_balances) = self.cumulative_balances.get(&merchant_id) {
+    fn calculate_balance_var(&self, merchant_id: String, confidence_level: f64) -> PyResult<f64> {
+        let cumulative_balances = {
+            let cumulative_balances = self.cumulative_balances.lock().unwrap();
+            cumulative_balances.get(&merchant_id).cloned()
+        };
+
+        if let Some(cumulative_balances) = cumulative_balances {
             if cumulative_balances.len() <= 1 {
                 return Err(pyo3::exceptions::PyValueError::new_err("Not enough balance data to calculate VaR"));
             }
             let var = self.calculate_var(cumulative_balances.clone(), confidence_level)?;
-            self.var_cumulative_balances.entry(merchant_id).or_default().push(var);
+            let mut var_cumulative_balances = self.var_cumulative_balances.lock().unwrap();
+            var_cumulative_balances.entry(merchant_id).or_default().push(var);
             Ok(var)
         } else {
             Err(pyo3::exceptions::PyValueError::new_err("Merchant ID not found"))
@@ -108,6 +149,6 @@ impl PaymentHandler {
 
 #[pymodule]
 fn payment_handler_rs(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PaymentHandler>()?;
+    m.add_class::<PaymentHandlerParallel>()?;
     Ok(())
 }

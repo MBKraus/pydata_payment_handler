@@ -19,8 +19,8 @@ release:
 python_handler:
 	python handler_py.py
 
-rust_handler:
-	python handler_rs.py
+rust_parallel_handler:
+	python handler_rs_parallel.py
 
 generate_payments:
 	python generate_payments.py

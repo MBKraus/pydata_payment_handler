@@ -4,7 +4,7 @@ import pandas as pd
 import joblib
 
 python_data = joblib.load('artefacts/python/time_taken.joblib')
-rust_data = joblib.load('artefacts/rust/time_taken.joblib')
+rust_data = joblib.load('artefacts/rust_parallel/time_taken.joblib')
 
 # Create a DataFrame for easier plotting with Seaborn
 df = pd.DataFrame({
@@ -13,10 +13,10 @@ df = pd.DataFrame({
 })
 
 # Create a DataFrame for easier plotting with Seaborn
-df = pd.DataFrame({
-    'value': python_data,
-    'distribution': ['Python'] * len(python_data)
-})
+# df = pd.DataFrame({
+#     'value': python_data,
+#     'distribution': ['Python'] * len(python_data)
+# })
 
 # Plotting
 plt.figure(figsize=(10, 6))

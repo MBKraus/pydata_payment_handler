@@ -1,5 +1,5 @@
 
-from payment_handler_rs import PaymentHandler
+from payment_handler_rs import PaymentHandlerParallel
 import time
 import cProfile
 import os
@@ -34,21 +34,21 @@ def main():
         start_time = time.time()
         profiler.enable()
 
-        payment_handler = PaymentHandler()
-        for payment in payments:
-            payment_handler.process_payment(payment["merchant_id"], payment["amount"])
-            if payment_handler.get_payment_count(payment["merchant_id"]) % config['periodic_statistics_interval'] == 0:
-                payment_handler.update_periodic_statistics(payment["merchant_id"], config['periodic_statistics_window_size'])
-                payment_handler.calculate_balance_var(payment["merchant_id"], config['confidence_interval'])
+        payment_handler = PaymentHandlerParallel()
+        payment_handler.process_payments(
+            [(payment["merchant_id"], payment["amount"]) for payment in payments],
+            config['periodic_statistics_interval'],
+            config['periodic_statistics_window_size'],
+            config['confidence_interval'])
 
         profiler.disable()
-        profiler.dump_stats(f"artefacts/rust/run_{run_index + 1}.prof")
+        profiler.dump_stats(f"artefacts/rust_parallel/run_{run_index + 1}.prof")
 
         end_time = time.time()
         elapsed_time = log_time(start_time, end_time)
         time_taken.append(elapsed_time)
 
-    joblib.dump(time_taken, 'artefacts/rust/time_taken.joblib')
+    joblib.dump(time_taken, 'artefacts/rust_parallel/time_taken.joblib')
     logger.info(f"Average time taken: {sum(time_taken)/len(time_taken):.2f} seconds")
     logger.info(f"Max time taken: {max(time_taken):.2f} seconds")
     logger.info(f"Min time taken: {min(time_taken):.2f} seconds")
