@@ -20,7 +20,7 @@ df = pd.DataFrame({
 
 # Plotting
 plt.figure(figsize=(10, 6))
-sns.histplot(data=df, x='value', hue='distribution', element='step', stat='count', common_norm=False, kde=True)
+sns.histplot(data=df, x='value', hue='distribution', element='step', stat='count', common_norm=False, kde=True, bins=40)
 
 # Add vertical lines for means
 mean1 = df[df['distribution'] == 'Python']['value'].mean()
