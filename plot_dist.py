@@ -4,38 +4,46 @@ import pandas as pd
 import joblib
 
 python_data = joblib.load('artefacts/python/time_taken.joblib')
-rust_data = joblib.load('artefacts/rust_parallel/time_taken.joblib')
+rust_parallel_data = joblib.load('artefacts/rust_parallel/time_taken.joblib')
+rust_single_data = joblib.load('artefacts/rust_single/time_taken.joblib')
 
-# Create a DataFrame for easier plotting with Seaborn
 df = pd.DataFrame({
-    'value': python_data + rust_data,
-    'distribution': ['Python'] * len(python_data) + ['Rust'] * len(rust_data)
+    'value': python_data + rust_parallel_data + rust_single_data,
+    'distribution': ['Python'] * len(python_data) + ['Rust_parallel'] * len(rust_parallel_data) + ['Rust_single'] * len(rust_single_data)
 })
 
-# Create a DataFrame for easier plotting with Seaborn
+# df = pd.DataFrame({
+#     'value': python_data + rust_single_data,
+#     'distribution': ['Python'] * len(python_data) + ['Rust_single'] * len(rust_single_data)
+# })
+
 # df = pd.DataFrame({
 #     'value': python_data,
 #     'distribution': ['Python'] * len(python_data)
 # })
 
-# Plotting
 plt.figure(figsize=(10, 6))
-sns.histplot(data=df, x='value', hue='distribution', element='step', stat='count', common_norm=False, kde=True, bins=40)
+sns.histplot(data=df, x='value', hue='distribution', element='step', stat='count', common_norm=False, kde=True, bins=20)
 
-# Add vertical lines for means
-mean1 = df[df['distribution'] == 'Python']['value'].mean()
-mean2 = df[df['distribution'] == 'Rust']['value'].mean()
+distributions = {
+    'Python': 'blue',
+    'Rust_single': 'green',
+    'Rust_parallel': 'orange'
+}
 
-plt.axvline(mean1, color='blue', linestyle='--', label=f'Mean Python: {mean1:.2f}')
-plt.axvline(mean2, color='orange', linestyle='--', label=f'Mean Rust: {mean2:.2f}')
+for dist, color in distributions.items():
+    mean = df[df['distribution'] == dist]['value'].mean()
+    stddev = df[df['distribution'] == dist]['value'].std()
+    plt.axvline(mean, color=color, linestyle='--', label=f'Mean {dist}: {mean:.2f}, Stddev: {stddev:.2f}')
 
-plt.legend()
-plt.title('Distribution Plot')
-plt.xlabel('Seconds')
-plt.ylabel('Count')
+ax = plt.gca()  
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+plt.legend(loc='upper right')
 
-# Save the plot as a PNG file
+plt.xlabel('Seconds', fontweight='bold')
+plt.ylabel('Count', fontweight='bold')
+
 # plt.savefig('distribution_plot.png', format='png', dpi=300)
 
-# Show the plot
 plt.show()
