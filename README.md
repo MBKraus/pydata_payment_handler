@@ -11,4 +11,4 @@ Steps to run the payment handler scripts:
 3) ensure you put the path to your virtual environment in VIRTUAL_ENV (`export VIRTUAL_ENV=<path_to_virtual_env>`)
 4) build and install the wheel in your Python environment (`maturin develop`)
 5) generate payment batches with `make generate_payments`
-6) run the Python and Rust payment handler with `make python_handler` and `make rust_handler`, respectively
+6) run the Python and Rust payment handler with `make python_handler`, `make rust_parallel_handler` and `rust_single_threaded_handler`, respectively
